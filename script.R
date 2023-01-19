@@ -1,9 +1,9 @@
 # Setare fisier de lucru
 rm(list = ls()) 
-directory <- "D:/Facultate/Econometrie/proiect_econometrie/"
+directory <- "C:/Users/alexd/Desktop/econometrie/proiect_econometrie/"
 
 # Instalarea pachetelor
-PackageNames <- c("readxl","dplyr","tidyverse", "stargazer", "magrittr", "ggplot2", "lmtest", "DataCombine", "dplyr", "tseries", "caret", "car", "olsrr", "moments", "whitestrap", "plm", "nortest", "Metrics", "MLmetrics")
+PackageNames <- c("readxl","dplyr","tidyverse", "stargazer", "magrittr", "ggplot2", "lmtest", "DataCombine", "dplyr", "tseries", "caret", "car", "olsrr", "moments", "whitestrap", "plm", "nortest", "Metrics", "MLmetrics", "glmnet")
 for(i in PackageNames){
   if(!require(i, character.only = T)){
     install.packages(i, dependencies = T)
@@ -457,6 +457,145 @@ CarPriceAssigment_cook2 <- CarPriceAssigment[-c(14,16,49,50,59,68,70,73,74,101,1
 model_regm_enginesize5<-lm(price ~ enginesize + compressionratio + peakrpm + lag1, data=CarPriceAssigment_cook2)
 jarque.bera.test(model_regm_enginesize5$residuals) # 0.0889 > 0.05 reziduurile sunt normal distribuite
 ols_plot_cooksd_bar(model_regm_enginesize5)
+# Regresia Ridge----
+# Regresie liniara multipla
+model0 <- lm(price ~ enginesize + compressionratio + peakrpm , CarPriceAssigment)
+summary(model0)
+prognoza <- data.frame(enginesize = c(100),
+                       compressionratio = c(5),
+                       peakrpm = c(5000))
+y_pred_scenariu <- predict(model0, newdata = prognoza)
+y_pred_scenariu
+
+# Definim variabila raspuns
+y <- CarPriceAssigment$price
+
+# Definim predictorii
+x <- data.matrix(CarPriceAssigment[, c('enginesize', 'compressionratio', 'peakrpm')])
+
+# Estimam modelul ridge (alpha = 0)
+model <- glmnet(x, y, alpha = 0)
+summary(model)
+
+# In continuare vom identifica valoarea lui lambda pt care avem MSE minimizat
+# utilizand validarea incrucisata (cross validation)
+cv_model <- cv.glmnet(x, y, alpha = 0)
+best_lambda <- cv_model$lambda.min
+best_lambda # 0.7944065
+
+# testarea valorii lamda 
+plot(cv_model) 
+
+# Reimplementam modelul cu valoarea lamda optima
+best_model <- glmnet(x, y, alpha = 0, lambda = best_lambda)
+coef(best_model) # coeficientii variabilelor 
+
+# Diagrama Trace pentru a vizualiza modul in care estimarile coeficientulilor s-au
+# modificat ca urmare a cresterii valorii lui lambda
+plot(model, xvar = "lambda")
+legend("bottomright", lwd = 1, col = 1:3, legend = colnames(x), cex = .7)
+
+# Prognoze 
+y_predicted <- predict(model, s = best_lambda, newx = x)
+
+# Progoza out-of-sample
+new <- matrix(c(100, 5, 5000), nrow=1, ncol=6) 
+predict(best_model, s = best_lambda, newx = new)
+
+# calcularea lui R2
+sst <- sum((y - mean(y))^2)
+sse <- sum((y_predicted - y)^2)
+rsq <- 1 - sse/sst
+rsq # 37.23%
+
+# Regresia LASSO----
+# SSR + lambda*sum(|beta|)
+model <- glmnet(x, y, alpha = 1)
+
+# Din punct de vedere tehnic, vom seta valoarea alpha = 1 pentru 
+# regresia LASSO. 
+cv_model <- cv.glmnet(x, y, alpha = 1)
+
+# Valoarea optima a lui lambda
+best_lambda <- cv_model$lambda.min
+best_lambda # 21.77486
+
+# testarea valorii lamda
+plot(cv_model) 
+
+
+# Reimplementam modelul cu valoarea lamda optima
+best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+coef(best_model) # coeficientii variabilelor 
+# Diagrama Trace pentru a vizualiza modul in care estimarile coeficientulilor s-au
+# modificat ca urmare a cresterii valorii lui lambda
+plot(model, xvar = "lambda",label=T)
+legend("bottomright", lwd = 1, col = 1:3, legend = colnames(x), cex = .7)
+
+# Prognoze 
+y_predicted <- predict(best_model, s = best_lambda, newx = x)
+
+# Prognoza out-of-sample
+#'enginesize', 'compressionratio', 'peakrpm'
+new <- matrix(c(100, 5, 5000), nrow=1, ncol=3) 
+predict(best_model, s = best_lambda, newx = new)
+
+# calcularea lui R2
+sst <- sum((y - mean(y))^2)
+sse <- sum((y_predicted - y)^2)
+rsq <- 1 - sse/sst
+rsq # 79.44445%
+# Elastic net regression----
+# adauga ambele penalitati SSR + lambda*sum(beta^2) + lambda*sum(|beta|)
+model <- cv.glmnet(x, y, alpha = 0.5)
+cv_model <- cv.glmnet(x, y, alpha = 0.5)
+
+# Valoarea optima a lui lambda
+best_lambda <- cv_model$lambda.min
+best_lambda # 30.01714
+
+
+# testarea valorii lamda
+plot(cv_model) 
+
+# Reimplementam modelul cu valoarea lamda optima
+best_model <- glmnet(x, y, alpha = 0.5, lambda = best_lambda)
+coef(best_model) # coeficientii variabilelor 
+
+# Prognoze 
+y_predicted <- predict(best_model, s = best_lambda, newx = x)
+
+# Prognoza out-of-sample
+#'enginesize', 'compressionratio', 'peakrpm'
+new <- matrix(c(100, 5, 5000), nrow=1, ncol=3) 
+predict(best_model, s = best_lambda, newx = new)
+
+# calcularea lui R2
+sst <- sum((y - mean(y))^2)
+sse <- sum((y_predicted - y)^2)
+rsq <- 1 - sse/sst
+rsq # 79.44065%
+
+# Vom compara valorile lui rsq si in functie de acestea vom alege modelul cu cea
+# mai mare bonitate drept modelul optim 
+# Algoritmul Boruta---- 
+CarPriceAssigmentCSV <- read.csv(paste0(directory, "CarPriceAssigment.csv"))
+CarPriceAssigmentCSV[,convert] <- data.frame(apply(CarPriceAssigmentCSV[convert], 2, as.factor))
+
+# Vom converti variabilele categoricale in variabile factor 
+convert <- c(5:10)
+
+library(Boruta)
+set.seed(111)
+boruta.bank_train <- Boruta(price~., data = CarPriceAssigmentCSV, doTrace = 2)
+print(boruta.bank_train)
+
+# Vom selecta atributele importante 
+getSelectedAttributes(boruta.bank_train, withTentative = T)
+
+# Vom reimplementa un model de regresie cu aceste atribute
+model_boruta <- lm(price ~ car_ID + symboling + CarName + fueltype + aspiration + carbody + drivewheel + drivewheel + enginelocation + wheelbase + carlength + carwidth + carheight + curbweight + enginetype + cylindernumber + enginesize + fuelsystem + boreratio + stroke + compressionratio + horsepower +  citympg + highwaympg + lprice + lenginesize + lcompressionratio + lpeakrpm, CarPriceAssigmentCSV)
+summary(model_boruta) 
 #7.Imbunatatirea regresiei multiple prin adoptarea altei forme functionale si prin adaugarea unei variabile dummy----
 model_ptr_det2 <- lm(price ~ fueltype + enginelocation, CarPriceAssigment)
 summary(model_ptr_det2)
