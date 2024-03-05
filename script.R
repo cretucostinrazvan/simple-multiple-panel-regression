@@ -1,6 +1,6 @@
 # Setare fisier de lucru
 rm(list = ls()) 
-directory <- "C:/Users/alexd/Desktop/econometrie/proiect_econometrie/"
+directory <- ""
 
 # Instalarea pachetelor
 PackageNames <- c("readxl","dplyr","tidyverse", "stargazer", "magrittr", "ggplot2", "lmtest", "DataCombine", "dplyr", "tseries", "caret", "car", "olsrr", "moments", "whitestrap", "plm", "nortest", "Metrics", "MLmetrics", "glmnet")
